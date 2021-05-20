@@ -80,6 +80,8 @@ int main(int argc, char** argv)
 
         cv::Mat src = cv::imread(filename, cv::IMREAD_GRAYSCALE);
 
+        imshow("Original", src);
+
         const int numImgPixels = src.rows * src.cols;
 
         const int numGoodPixels = numImgPixels / 10;
@@ -118,6 +120,16 @@ int main(int argc, char** argv)
             context.b.push_back(src.reshape(1, 1).at<uint8_t>(v));
         }
 
+
+        cv::Mat squeezed = cv::Mat::zeros(src.rows, src.cols, CV_8UC1);
+        for (int i = 0; i < context.ri.size(); ++i)
+        {
+            const int idx = context.ri[i];
+            squeezed.reshape(1, 1).at<uint8_t>(idx) = context.b[i];
+        }
+
+        imshow("Squeezed", squeezed);
+
         //////////////////////////////////////////////////////////////////////////
 
         const double param_c = 5;
@@ -148,7 +160,7 @@ int main(int argc, char** argv)
         cv::Mat dst;
         Xa.convertTo(dst, CV_8U);
 
-        imshow("dst filtered", dst);
+        imshow("Restored", dst);
 
         cv::waitKey();
 
