@@ -64,11 +64,12 @@ static lbfgsfloatval_t evaluate(
         Axb2.reshape(1, 1).at<double>(idx) = Ax;
     }
 
-    cv::Mat AtAxb2;
+    cv::Mat AtAxb2(context->imageSize.height,
+        context->imageSize.width,
+        CV_64FC1,
+        g);
     cv::dct(Axb2, AtAxb2);
     AtAxb2 *= 2;
-
-    memcpy(g, AtAxb2.data, n * sizeof(double));
 
     return fx;
 };
@@ -155,7 +156,7 @@ int main(int argc, char** argv)
         param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
         int lbfgs_ret = lbfgs(numImgPixels, x, &fx, evaluate, progress, &context, &param);
 
-        cv::Mat Xat2 = cv::Mat(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
+        cv::Mat Xat2(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
 
         cv::Mat Xa;
         idct(Xat2, Xa);
