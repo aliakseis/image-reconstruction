@@ -45,7 +45,10 @@ static lbfgsfloatval_t evaluate(
 {
     auto context = static_cast<LbfgsContext*>(instance);
 
-    cv::Mat x2 = cv::Mat(context->imageSize.height, context->imageSize.width, CV_64FC1, const_cast<void*>(static_cast<const void*>(x)));// .t();
+    const cv::Mat x2(context->imageSize.height, 
+        context->imageSize.width, 
+        CV_64FC1, 
+        const_cast<void*>(static_cast<const void*>(x)));
 
     cv::Mat Ax2;
     cv::idct(x2, Ax2);
@@ -64,7 +67,6 @@ static lbfgsfloatval_t evaluate(
     cv::Mat AtAxb2;
     cv::dct(Axb2, AtAxb2);
     AtAxb2 *= 2;
-    //cv::transpose(AtAxb2, AtAxb2);
 
     memcpy(g, AtAxb2.data, n * sizeof(double));
 
@@ -108,7 +110,9 @@ int main(int argc, char** argv)
 
                 if (idx != j)
                 {
-                    int& to_exchange = (idx < numGoodPixels) ? context.ri[idx] : displaced.try_emplace(idx, idx).first->second;
+                    int& to_exchange = (idx < numGoodPixels)
+                        ? context.ri[idx]
+                        : displaced.try_emplace(idx, idx).first->second;
                     std::swap(context.ri[j], to_exchange);
                 }
             }
@@ -151,7 +155,7 @@ int main(int argc, char** argv)
         param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
         int lbfgs_ret = lbfgs(numImgPixels, x, &fx, evaluate, progress, &context, &param);
 
-        cv::Mat Xat2 = cv::Mat(context.imageSize.height, context.imageSize.width, CV_64FC1, const_cast<void*>(static_cast<const void*>(x)));// .t();
+        cv::Mat Xat2 = cv::Mat(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
 
         cv::Mat Xa;
         idct(Xat2, Xa);
