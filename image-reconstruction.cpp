@@ -59,9 +59,9 @@ static lbfgsfloatval_t evaluate(
     for (int i = 0; i < context->ri.size(); ++i)
     {
         const int idx = context->ri[i];
-        const auto Ax = Ax2.reshape(1, 1).at<double>(idx) - context->b[i];
+        const auto Ax = static_cast<double*>(static_cast<void*>(Ax2.data))[idx] - context->b[i];
         fx += Ax * Ax;
-        Axb2.reshape(1, 1).at<double>(idx) = Ax;
+        static_cast<double*>(static_cast<void*>(Axb2.data))[idx] = Ax;
     }
 
     cv::Mat AtAxb2(context->imageSize.height,
@@ -98,8 +98,9 @@ int main(int argc, char** argv)
             std::default_random_engine dre;
 
             context.ri.resize(numGoodPixels);
-            for (int j = 0; j < numGoodPixels; ++j)
+            for (int j = 0; j < numGoodPixels; ++j) {
                 context.ri[j] = j;
+            }
 
             std::map<int, int> displaced;
 
@@ -122,7 +123,7 @@ int main(int argc, char** argv)
         context.b.reserve(numGoodPixels);
         for (auto& v : context.ri)
         {
-            context.b.push_back(src.reshape(1, 1).at<uint8_t>(v));
+            context.b.push_back(src.data[v]);
         }
 
 
@@ -130,7 +131,7 @@ int main(int argc, char** argv)
         for (int i = 0; i < context.ri.size(); ++i)
         {
             const int idx = context.ri[i];
-            squeezed.reshape(1, 1).at<uint8_t>(idx) = context.b[i];
+            squeezed.data[idx] = context.b[i];
         }
 
         imshow("Squeezed", squeezed);
@@ -142,7 +143,7 @@ int main(int argc, char** argv)
         // Initialize solution vector
         lbfgsfloatval_t fx;
         lbfgsfloatval_t *x = lbfgs_malloc(numImgPixels);
-        if (x == NULL) {
+        if (x == nullptr) {
             //
         }
         for (int i = 0; i < numImgPixels; i++) {
@@ -152,7 +153,7 @@ int main(int argc, char** argv)
         // Initialize the parameters for the optimization.
         lbfgs_parameter_t param;
         lbfgs_parameter_init(&param);
-        param.orthantwise_c = (lbfgsfloatval_t)param_c; // this tells lbfgs to do OWL-QN
+        param.orthantwise_c = param_c; // this tells lbfgs to do OWL-QN
         param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
         int lbfgs_ret = lbfgs(numImgPixels, x, &fx, evaluate, progress, &context, &param);
 
