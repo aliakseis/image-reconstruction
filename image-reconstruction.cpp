@@ -7,11 +7,47 @@
 
 #include <lbfgs.h>
 
+#include <algorithm>
 #include <iostream>
 #include <random>
 #include <map>
 #include <vector>
 #include <exception>
+
+
+static auto GetRandomInts(int numGoodPixels, int numImgPixels)
+{
+    std::vector<int> ri;
+
+    std::default_random_engine dre;
+
+    ri.resize(numGoodPixels);
+    for (int j = 0; j < numGoodPixels; ++j) {
+        ri[j] = j;
+    }
+
+    std::map<int, int> displaced;
+
+    // Fisher-Yates shuffle Algorithm
+    for (int j = 0; j < numGoodPixels; ++j)
+    {
+        std::uniform_int_distribution<int> di(j, numImgPixels - 1);
+        int idx = di(dre);
+
+        if (idx != j)
+        {
+            int& to_exchange = (idx < numGoodPixels)
+                ? ri[idx]
+                : displaced.try_emplace(idx, idx).first->second;
+            std::swap(ri[j], to_exchange);
+        }
+    }
+
+    std::sort(ri.begin(), ri.end());
+
+    return ri;
+}
+
 
 struct LbfgsContext {
     cv::Size imageSize;
@@ -94,31 +130,7 @@ int main(int argc, char** argv)
         context.imageSize.width = src.cols;
         context.imageSize.height = src.rows;
 
-        {
-            std::default_random_engine dre;
-
-            context.ri.resize(numGoodPixels);
-            for (int j = 0; j < numGoodPixels; ++j) {
-                context.ri[j] = j;
-            }
-
-            std::map<int, int> displaced;
-
-            // Fisher-Yates shuffle Algorithm
-            for (int j = 0; j < numGoodPixels; ++j)
-            {
-                std::uniform_int_distribution<int> di(j, numImgPixels - 1);
-                int idx = di(dre);
-
-                if (idx != j)
-                {
-                    int& to_exchange = (idx < numGoodPixels)
-                        ? context.ri[idx]
-                        : displaced.try_emplace(idx, idx).first->second;
-                    std::swap(context.ri[j], to_exchange);
-                }
-            }
-        }
+        context.ri = GetRandomInts(numGoodPixels, numImgPixels);
 
         context.b.reserve(numGoodPixels);
         for (auto& v : context.ri)
