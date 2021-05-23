@@ -112,11 +112,21 @@ static lbfgsfloatval_t evaluate(
 
 int main(int argc, char** argv)
 {
-    const char* default_file = "/Users/Usrer/Pictures/20191216_102803.jpg";
-    const char* filename = argc >= 2 ? argv[1] : default_file;
-
     try {
-
+        cv::String filename;
+        if (argc >= 2)
+            filename = argv[1];
+        else {
+            try {
+                filename = cv::samples::findFile("lena.jpg");
+            }
+            catch (const std::exception& ex) {
+                std::string s(ex.what());
+                s = s.substr(s.find(") ") + 2);
+                s = s.substr(0, s.find("modules"));
+                filename = s + "samples/data/lena.jpg";
+            }
+        }
         cv::Mat src = cv::imread(filename, cv::IMREAD_GRAYSCALE);
 
         imshow("Original", src);
