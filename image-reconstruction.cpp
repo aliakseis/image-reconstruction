@@ -7,6 +7,8 @@
 
 #include <lbfgs.h>
 
+#include <fftw3.h>
+
 #include <algorithm>
 #include <iostream>
 #include <random>
@@ -81,15 +83,24 @@ static lbfgsfloatval_t evaluate(
 {
     auto context = static_cast<LbfgsContext*>(instance);
 
-    const cv::Mat x2(context->imageSize.height, 
-        context->imageSize.width, 
-        CV_64FC1, 
-        const_cast<void*>(static_cast<const void*>(x)));
+    //const cv::Mat x2(context->imageSize.height, 
+    //    context->imageSize.width, 
+    //    CV_64FC1, 
+    //    const_cast<void*>(static_cast<const void*>(x)));
 
-    cv::Mat Ax2;
-    cv::idct(x2, Ax2);
+    //cv::Mat Ax2;
+    //cv::idct(x2, Ax2);
 
-    cv::Mat Axb2 = cv::Mat::zeros(x2.rows, x2.cols, CV_64FC1);
+    cv::Mat Ax2(context->imageSize.height, context->imageSize.width, CV_64FC1);
+    fftw_plan idct_plan = fftw_plan_r2r_2d(
+        context->imageSize.height, context->imageSize.width, const_cast<double*>(x),
+        static_cast<double*>(static_cast<void*>(Ax2.data)),
+        FFTW_REDFT01, FFTW_REDFT01, FFTW_MEASURE);
+    fftw_execute(idct_plan);
+    fftw_destroy_plan(idct_plan);
+    Ax2 /= sqrt(2.0*context->imageSize.height * context->imageSize.width);
+
+    cv::Mat Axb2 = cv::Mat::zeros(context->imageSize.height, context->imageSize.width, CV_64FC1);
 
     double fx = 0;
     for (int i = 0; i < context->ri.size(); ++i)
@@ -100,13 +111,24 @@ static lbfgsfloatval_t evaluate(
         static_cast<double*>(static_cast<void*>(Axb2.data))[idx] = Ax;
     }
 
-    cv::Mat AtAxb2(context->imageSize.height,
-        context->imageSize.width,
-        CV_64FC1,
-        g);
-    cv::dct(Axb2, AtAxb2);
-    AtAxb2 *= 2;
+    //cv::Mat AtAxb2(context->imageSize.height,
+    //    context->imageSize.width,
+    //    CV_64FC1,
+    //    g);
+    //cv::dct(Axb2, AtAxb2);
+    //AtAxb2 *= 2;
 
+    fftw_plan dct_plan = fftw_plan_r2r_2d(context->imageSize.height, context->imageSize.width, 
+        static_cast<double*>(static_cast<void*>(Axb2.data)),
+        g,
+        FFTW_REDFT10, FFTW_REDFT10, FFTW_MEASURE);
+    fftw_execute(dct_plan);
+    fftw_destroy_plan(dct_plan);
+    for (int i = 0; i < context->imageSize.height; i++) {
+        for (int j = 0; j < context->imageSize.width; j++) {
+            g[i*context->imageSize.width + j] /= /*2.0 **/ sqrt(2.0*context->imageSize.width*context->imageSize.height);
+        }
+    }
     return fx;
 };
 
@@ -179,10 +201,18 @@ int main(int argc, char** argv)
         param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
         int lbfgs_ret = lbfgs(numImgPixels, x, &fx, evaluate, progress, &context, &param);
 
-        cv::Mat Xat2(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
+        //cv::Mat Xat2(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
+        //cv::Mat Xa;
+        //idct(Xat2, Xa);
 
-        cv::Mat Xa;
-        idct(Xat2, Xa);
+        cv::Mat Xa(context.imageSize.height, context.imageSize.width, CV_64FC1);
+        fftw_plan idct_plan = fftw_plan_r2r_2d(
+            context.imageSize.height, context.imageSize.width, const_cast<double*>(x),
+            static_cast<double*>(static_cast<void*>(Xa.data)),
+            FFTW_REDFT01, FFTW_REDFT01, FFTW_MEASURE);
+        fftw_execute(idct_plan);
+        fftw_destroy_plan(idct_plan);
+        Xa /= sqrt(2.0*context.imageSize.height * context.imageSize.width);
 
         lbfgs_free(x);
 
