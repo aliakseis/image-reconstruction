@@ -53,7 +53,7 @@ static auto GetRandomInts(int numGoodPixels, int numImgPixels)
 
 struct LbfgsContext {
     cv::Size imageSize;
-    std::vector<int> ri;
+    std::vector <bool> ri;
     std::vector<uint8_t> b;
 };
 
@@ -98,17 +98,28 @@ static lbfgsfloatval_t evaluate(
         FFTW_REDFT01, FFTW_REDFT01, FFTW_MEASURE);
     fftw_execute(idct_plan);
     fftw_destroy_plan(idct_plan);
-    Ax2 /= sqrt(2.0*context->imageSize.height * context->imageSize.width);
+    //Ax2 /= sqrt(2.0*context->imageSize.height * context->imageSize.width);
 
-    cv::Mat Axb2 = cv::Mat::zeros(context->imageSize.height, context->imageSize.width, CV_64FC1);
+    //cv::Mat Axb2 = cv::Mat::zeros(context->imageSize.height, context->imageSize.width, CV_64FC1);
+
+    const auto coeff = 1. / sqrt(2.0*context->imageSize.height * context->imageSize.width);
 
     double fx = 0;
+    auto it = context->b.begin();
     for (int i = 0; i < context->ri.size(); ++i)
     {
-        const int idx = context->ri[i];
-        const auto Ax = static_cast<double*>(static_cast<void*>(Ax2.data))[idx] - context->b[i];
-        fx += Ax * Ax;
-        static_cast<double*>(static_cast<void*>(Axb2.data))[idx] = Ax;
+        //const int idx = context->ri[i];
+        auto &v = static_cast<double*>(static_cast<void*>(Ax2.data))[i];
+        if (context->ri[i])
+        {
+            const auto Ax = v * coeff - *(it++);
+            v = Ax;
+            fx += Ax * Ax;
+        }
+        else
+        {
+            v = 0;
+        }
     }
 
     //cv::Mat AtAxb2(context->imageSize.height,
@@ -119,14 +130,14 @@ static lbfgsfloatval_t evaluate(
     //AtAxb2 *= 2;
 
     fftw_plan dct_plan = fftw_plan_r2r_2d(context->imageSize.height, context->imageSize.width, 
-        static_cast<double*>(static_cast<void*>(Axb2.data)),
+        static_cast<double*>(static_cast<void*>(Ax2.data)),
         g,
         FFTW_REDFT10, FFTW_REDFT10, FFTW_MEASURE);
     fftw_execute(dct_plan);
     fftw_destroy_plan(dct_plan);
     for (int i = 0; i < context->imageSize.height; i++) {
         for (int j = 0; j < context->imageSize.width; j++) {
-            g[i*context->imageSize.width + j] /= /*2.0 **/ sqrt(2.0*context->imageSize.width*context->imageSize.height);
+            g[i*context->imageSize.width + j] *= coeff;  //  /= /*2.0 **/ sqrt(2.0*context->imageSize.width*context->imageSize.height);
         }
     }
     return fx;
@@ -162,19 +173,21 @@ int main(int argc, char** argv)
         context.imageSize.width = src.cols;
         context.imageSize.height = src.rows;
 
-        context.ri = GetRandomInts(numGoodPixels, numImgPixels);
+        auto ri = GetRandomInts(numGoodPixels, numImgPixels);
 
+        context.ri.resize(numImgPixels);
         context.b.reserve(numGoodPixels);
-        for (auto& v : context.ri)
+        for (auto& v : ri)
         {
+            context.ri[v] = true;
             context.b.push_back(src.data[v]);
         }
 
 
         cv::Mat squeezed = cv::Mat::zeros(src.rows, src.cols, CV_8UC1);
-        for (int i = 0; i < context.ri.size(); ++i)
+        for (int i = 0; i < ri.size(); ++i)
         {
-            const int idx = context.ri[i];
+            const int idx = ri[i];
             squeezed.data[idx] = context.b[i];
         }
 
