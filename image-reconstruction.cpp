@@ -7,7 +7,11 @@
 
 #include <lbfgs.h>
 
+#define USE_FFTW 0
+
+#if USE_FFTW
 #include <fftw3.h>
+#endif
 
 #include <algorithm>
 #include <iostream>
@@ -83,14 +87,7 @@ static lbfgsfloatval_t evaluate(
 {
     auto context = static_cast<LbfgsContext*>(instance);
 
-    //const cv::Mat x2(context->imageSize.height, 
-    //    context->imageSize.width, 
-    //    CV_64FC1, 
-    //    const_cast<void*>(static_cast<const void*>(x)));
-
-    //cv::Mat Ax2;
-    //cv::idct(x2, Ax2);
-
+#if USE_FFTW
     cv::Mat Ax2(context->imageSize.height, context->imageSize.width, CV_64FC1);
     fftw_plan idct_plan = fftw_plan_r2r_2d(
         context->imageSize.height, context->imageSize.width, const_cast<double*>(x),
@@ -98,17 +95,24 @@ static lbfgsfloatval_t evaluate(
         FFTW_REDFT01, FFTW_REDFT01, FFTW_MEASURE);
     fftw_execute(idct_plan);
     fftw_destroy_plan(idct_plan);
-    //Ax2 /= sqrt(2.0*context->imageSize.height * context->imageSize.width);
-
-    //cv::Mat Axb2 = cv::Mat::zeros(context->imageSize.height, context->imageSize.width, CV_64FC1);
 
     const auto coeff = 1. / sqrt(2.0*context->imageSize.height * context->imageSize.width);
+#else
+    const cv::Mat x2(context->imageSize.height, 
+        context->imageSize.width, 
+        CV_64FC1, 
+        const_cast<void*>(static_cast<const void*>(x)));
+
+    cv::Mat Ax2;
+    cv::idct(x2, Ax2);
+
+    const auto coeff = 1.;
+#endif
 
     double fx = 0;
     auto it = context->b.begin();
     for (int i = 0; i < context->ri.size(); ++i)
     {
-        //const int idx = context->ri[i];
         auto &v = static_cast<double*>(static_cast<void*>(Ax2.data))[i];
         if (context->ri[i])
         {
@@ -122,13 +126,7 @@ static lbfgsfloatval_t evaluate(
         }
     }
 
-    //cv::Mat AtAxb2(context->imageSize.height,
-    //    context->imageSize.width,
-    //    CV_64FC1,
-    //    g);
-    //cv::dct(Axb2, AtAxb2);
-    //AtAxb2 *= 2;
-
+#if USE_FFTW
     fftw_plan dct_plan = fftw_plan_r2r_2d(context->imageSize.height, context->imageSize.width, 
         static_cast<double*>(static_cast<void*>(Ax2.data)),
         g,
@@ -140,6 +138,15 @@ static lbfgsfloatval_t evaluate(
             g[i*context->imageSize.width + j] *= coeff;  //  /= /*2.0 **/ sqrt(2.0*context->imageSize.width*context->imageSize.height);
         }
     }
+#else
+    cv::Mat AtAxb2(context->imageSize.height,
+        context->imageSize.width,
+        CV_64FC1,
+        g);
+    cv::dct(Ax2, AtAxb2);
+    AtAxb2 *= 2;
+#endif
+
     return fx;
 };
 
@@ -214,10 +221,7 @@ int main(int argc, char** argv)
         param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
         int lbfgs_ret = lbfgs(numImgPixels, x, &fx, evaluate, progress, &context, &param);
 
-        //cv::Mat Xat2(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
-        //cv::Mat Xa;
-        //idct(Xat2, Xa);
-
+#if USE_FFTW
         cv::Mat Xa(context.imageSize.height, context.imageSize.width, CV_64FC1);
         fftw_plan idct_plan = fftw_plan_r2r_2d(
             context.imageSize.height, context.imageSize.width, const_cast<double*>(x),
@@ -226,6 +230,11 @@ int main(int argc, char** argv)
         fftw_execute(idct_plan);
         fftw_destroy_plan(idct_plan);
         Xa /= sqrt(2.0*context.imageSize.height * context.imageSize.width);
+#else
+        cv::Mat Xat2(context.imageSize.height, context.imageSize.width, CV_64FC1, x);
+        cv::Mat Xa;
+        idct(Xat2, Xa);
+#endif
 
         lbfgs_free(x);
 
