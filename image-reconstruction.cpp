@@ -173,36 +173,58 @@ int main(int argc, char** argv)
 
         const int numImgPixels = src.rows * src.cols;
 
-        const int numGoodPixels = numImgPixels / 10;
+        //const int numGoodPixels = numImgPixels / 10;
 
         LbfgsContext context;
 
         context.imageSize.width = src.cols;
         context.imageSize.height = src.rows;
 
-        auto ri = GetRandomInts(numGoodPixels, numImgPixels);
+        //auto ri = GetRandomInts(numGoodPixels, numImgPixels);
+
+        cv::Mat mask;
+        cv::threshold(src, mask, 215, 256, cv::THRESH_BINARY);
+
+        const int dilation_size = 3;
+        cv::Mat structure = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+            cv::Size(2 * dilation_size + 1, 2 * dilation_size + 1)
+            //cv::Point(dilation_size, dilation_size)
+        );
+        // Apply morphology operations
+        dilate(mask, mask, structure);
+
+        imshow("mask", mask);
+
 
         context.ri.resize(numImgPixels);
-        context.b.reserve(numGoodPixels);
-        for (auto& v : ri)
+        //context.b.reserve(numGoodPixels);
+        //for (auto& v : ri)
+        //{
+        //    context.ri[v] = true;
+        //    context.b.push_back(src.data[v]);
+        //}
+
+        for (int i = 0; i < numImgPixels; ++i)
         {
-            context.ri[v] = true;
-            context.b.push_back(src.data[v]);
+            if (!mask.data[i])
+            {
+                context.ri[i] = true;
+                context.b.push_back(src.data[i]);
+            }
         }
 
+        //cv::Mat squeezed = cv::Mat::zeros(src.rows, src.cols, CV_8UC1);
+        //for (int i = 0; i < ri.size(); ++i)
+        //{
+        //    const int idx = ri[i];
+        //    squeezed.data[idx] = context.b[i];
+        //}
 
-        cv::Mat squeezed = cv::Mat::zeros(src.rows, src.cols, CV_8UC1);
-        for (int i = 0; i < ri.size(); ++i)
-        {
-            const int idx = ri[i];
-            squeezed.data[idx] = context.b[i];
-        }
-
-        imshow("Squeezed", squeezed);
+        //imshow("Squeezed", squeezed);
 
         //////////////////////////////////////////////////////////////////////////
 
-        const double param_c = 5;
+        const double param_c = 20;
 
         // Initialize solution vector
         lbfgsfloatval_t fx;
