@@ -169,6 +169,7 @@ int main(int argc, char** argv)
         }
         cv::Mat src = cv::imread(filename, cv::IMREAD_GRAYSCALE);
 
+        cv::namedWindow("Original", cv::WINDOW_NORMAL);
         imshow("Original", src);
 
         const int numImgPixels = src.rows * src.cols;
@@ -198,6 +199,7 @@ int main(int argc, char** argv)
             squeezed.data[idx] = context.b[i];
         }
 
+        cv::namedWindow("Squeezed", cv::WINDOW_NORMAL);
         imshow("Squeezed", squeezed);
 
         //////////////////////////////////////////////////////////////////////////
@@ -241,6 +243,7 @@ int main(int argc, char** argv)
         cv::Mat dst;
         Xa.convertTo(dst, CV_8U);
 
+        cv::namedWindow("Restored", cv::WINDOW_NORMAL);
         imshow("Restored", dst);
 
         cv::waitKey();
